@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#101B34" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="mobile-web-app-capable" content="yes" />
+<title>FinanceFlow</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@18.3.1",
+    "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
+    "lucide-react": "https://esm.sh/lucide-react@0.383.0?external=react",
+    "recharts": "https://esm.sh/recharts@2.12.7?external=react,react-dom"
+  }
+}
+</script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; overscroll-behavior-y: none; background: #F5F7FA; }
+  body { font-family: Inter, sans-serif; -webkit-font-smoothing: antialiased; }
+  button, input, select { font-family: inherit; }
+  button { -webkit-user-select: none; user-select: none; }
+  input, select { -webkit-user-select: text; }
+  ::-webkit-scrollbar { width: 0; height: 0; }
+  #root { min-height: 100vh; min-height: 100dvh; }
+  #boot {
+    position: fixed; inset: 0; background: #101B34; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 14px; z-index: 999; transition: opacity .4s ease;
+  }
+  #boot .mark {
+    width: 56px; height: 56px; border-radius: 16px; background: #4FA3D1; display: flex; align-items: center;
+    justify-content: center; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 22px; color: #101B34;
+  }
+  #boot .label { font-family: 'Space Grotesk', sans-serif; color: white; font-size: 15px; font-weight: 700; letter-spacing: .3px; }
+  #boot .dots { display: flex; gap: 5px; }
+  #boot .dots span { width: 6px; height: 6px; border-radius: 99px; background: #4FA3D1; opacity: .4; animation: pulse 1s infinite ease-in-out; }
+  #boot .dots span:nth-child(2) { animation-delay: .15s; }
+  #boot .dots span:nth-child(3) { animation-delay: .3s; }
+  @keyframes pulse { 0%,100% { opacity: .3; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1); } }
+</style>
+</head>
+<body>
+<div id="boot">
+  <div class="mark">F</div>
+  <div class="label">FinanceFlow</div>
+  <div class="dots"><span></span><span></span><span></span></div>
+</div>
+<div id="root"></div>
+
+<script type="text/babel" data-type="module" data-presets="react">
+import React, { useState, useMemo, useEffect, useRef } from "react";
+import { createRoot } from "react-dom/client";
+import {
+  Home, Wallet, ArrowLeftRight, PieChart as PieIcon, Plus, X, Search,
+  ChevronRight, ChevronLeft, TrendingUp, Sparkles, Bell,
+  Utensils, Bus, Receipt, ShoppingBag, Film, HeartPulse, GraduationCap,
+  Building2, RefreshCcw, Plane, Gamepad2, MoreHorizontal, Briefcase,
+  Gift, Landmark, Coins, CreditCard, Smartphone, Banknote, Settings,
+  Target, Check, ArrowUpRight, ArrowDownRight
+} from "lucide-react";
+import {
+  ResponsiveContainer, PieChart, Pie, Cell, Tooltip,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid
+} from "recharts";
+
+/* ---------------------------------------------------------------------
+   FinanceFlow — design tokens
+   Navy #101B34 / Sky #4FA3D1 / Paper #F5F7FA / Green #1E9E6B /
+   Orange #E8963C / Red #E14B4B
+   Display+numerals: Space Grotesk (tabular) · Body: Inter · Ledger: IBM Plex Mono
+--------------------------------------------------------------------- */
+
+const C = {
+  navy: "#101B34",
+  navyDeep: "#0B1426",
+  sky: "#4FA3D1",
+  skySoft: "#EAF4FA",
+  paper: "#F5F7FA",
+  card: "#FFFFFF",
+  line: "#E7EBF0",
+  ink: "#101828",
+  sub: "#667085",
+  faint: "#98A2B3",
+  green: "#1E9E6B",
+  greenSoft: "#E7F7F0",
+  orange: "#E8963C",
+  orangeSoft: "#FDF1E3",
+  red: "#E14B4B",
+  redSoft: "#FCEAEA",
+};
+
+const fmt = (n, opts = {}) =>
+  "₱" + Math.abs(n).toLocaleString("en-PH", { minimumFractionDigits: opts.decimals ?? 0, maximumFractionDigits: opts.decimals ?? 0 });
+
+const WALLET_META = {
+  cash: { icon: Banknote, color: "#5B7DB1" },
+  gcash: { icon: Smartphone, color: "#0070E0" },
+  maya: { icon: Smartphone, color: "#00D28E" },
+  bdo: { icon: Landmark, color: "#0B3D91" },
+  bpi: { icon: Landmark, color: "#B8262A" },
+  card: { icon: CreditCard, color: "#7C4DFF" },
+};
+
+const CAT_META = {
+  Food: { icon: Utensils, color: "#E8963C" },
+  Transportation: { icon: Bus, color: "#4FA3D1" },
+  Bills: { icon: Receipt, color: "#8B5CF6" },
+  Shopping: { icon: ShoppingBag, color: "#EC4899" },
+  Entertainment: { icon: Film, color: "#F59E0B" },
+  Health: { icon: HeartPulse, color: "#E14B4B" },
+  Education: { icon: GraduationCap, color: "#0EA5E9" },
+  Rent: { icon: Building2, color: "#334155" },
+  Subscription: { icon: RefreshCcw, color: "#6366F1" },
+  Travel: { icon: Plane, color: "#14B8A6" },
+  Gaming: { icon: Gamepad2, color: "#A855F7" },
+  Other: { icon: MoreHorizontal, color: "#94A3B8" },
+  Salary: { icon: Briefcase, color: "#1E9E6B" },
+  Freelance: { icon: Coins, color: "#1E9E6B" },
+  Business: { icon: Building2, color: "#1E9E6B" },
+  Gift: { icon: Gift, color: "#1E9E6B" },
+};
+
+const initialWallets = [
+  { id: "w1", name: "GCash", type: "gcash", balance: 12500, active: true },
+  { id: "w2", name: "Maya", type: "maya", balance: 8250, active: true },
+  { id: "w3", name: "BDO", type: "bdo", balance: 45000, active: true },
+  { id: "w4", name: "Cash", type: "cash", balance: 5600, active: true },
+  { id: "w5", name: "BPI Savings", type: "bpi", balance: 20000, active: true },
+];
+
+const seedTx = [
+  { id: "t1", type: "income", category: "Salary", wallet: "BDO", amount: 45000, note: "August salary", date: "2026-08-29", time: "09:00" },
+  { id: "t2", type: "expense", category: "Food", wallet: "GCash", amount: 95, note: "Breakfast", date: "2026-08-29", time: "08:00" },
+  { id: "t3", type: "expense", category: "Food", wallet: "GCash", amount: 180, note: "Lunch", date: "2026-08-29", time: "12:30" },
+  { id: "t4", type: "expense", category: "Food", wallet: "GCash", amount: 120, note: "Coffee", date: "2026-08-29", time: "15:00" },
+  { id: "t5", type: "expense", category: "Transportation", wallet: "Cash", amount: 80, note: "Tricycle", date: "2026-08-29", time: "18:30" },
+  { id: "t6", type: "expense", category: "Bills", wallet: "Maya", amount: 1699, note: "Internet", date: "2026-08-27", time: "10:00" },
+  { id: "t7", type: "expense", category: "Shopping", wallet: "GCash", amount: 1250, note: "New shoes", date: "2026-08-26", time: "14:00" },
+  { id: "t8", type: "expense", category: "Entertainment", wallet: "Maya", amount: 549, note: "Netflix", date: "2026-08-24", time: "00:00" },
+  { id: "t9", type: "income", category: "Freelance", wallet: "GCash", amount: 6000, note: "Logo design", date: "2026-08-22", time: "17:00" },
+  { id: "t10", type: "expense", category: "Rent", wallet: "BDO", amount: 10000, note: "August rent", date: "2026-08-05", time: "09:00" },
+  { id: "t11", type: "expense", category: "Health", wallet: "Cash", amount: 650, note: "Vitamins", date: "2026-08-19", time: "11:00" },
+  { id: "t12", type: "expense", category: "Transportation", wallet: "GCash", amount: 320, note: "Grab", date: "2026-08-18", time: "20:00" },
+];
+
+const initialBudgets = [
+  { id: "b1", category: "Food", amount: 10000, spent: 8000 },
+  { id: "b2", category: "Transportation", amount: 5000, spent: 3500 },
+  { id: "b3", category: "Shopping", amount: 3000, spent: 2000 },
+  { id: "b4", category: "Bills", amount: 5000, spent: 4500 },
+];
+
+const initialGoals = [
+  { id: "g1", name: "Emergency Fund", icon: "🛟", target: 50000, current: 25000, targetDate: "2026-12-31" },
+  { id: "g2", name: "New Phone", icon: "📱", target: 30000, current: 12000, targetDate: "2026-11-15" },
+  { id: "g3", name: "Vacation", icon: "✈️", target: 20000, current: 8500, targetDate: "2027-01-20" },
+];
+
+const trend14 = [61200, 62800, 60500, 64200, 66900, 65100, 68400, 70200, 69100, 72500, 74800, 73200, 76500, 91350];
+
+function useCountUp(value, duration = 900) {
+  const [display, setDisplay] = useState(0);
+  const startRef = useRef(null);
+  const fromRef = useRef(0);
+  useEffect(() => {
+    fromRef.current = display;
+    startRef.current = null;
+    let raf;
+    const step = (ts) => {
+      if (!startRef.current) startRef.current = ts;
+      const p = Math.min(1, (ts - startRef.current) / duration);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setDisplay(fromRef.current + (value - fromRef.current) * eased);
+      if (p < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+  return Math.round(display);
+}
+
+function Sparkline({ data, height = 46, stroke = "#4FA3D1" }) {
+  const w = 260;
+  const min = Math.min(...data), max = Math.max(...data);
+  const pts = data.map((v, i) => {
+    const x = (i / (data.length - 1)) * w;
+    const y = height - ((v - min) / (max - min || 1)) * height;
+    return [x, y];
+  });
+  const d = pts.map((p, i) => (i === 0 ? `M${p[0]},${p[1]}` : `L${p[0]},${p[1]}`)).join(" ");
+  const areaD = `${d} L${w},${height} L0,${height} Z`;
+  const gid = "sg" + Math.round(Math.random() * 1e6);
+  return (
+    <svg viewBox={`0 0 ${w} ${height}`} width="100%" height={height} preserveAspectRatio="none" style={{ display: "block" }}>
+      <defs>
+        <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={stroke} stopOpacity="0.35" />
+          <stop offset="100%" stopColor={stroke} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={areaD} fill={`url(#${gid})`} stroke="none" />
+      <path d={d} fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={pts[pts.length - 1][0]} cy={pts[pts.length - 1][1]} r="3.5" fill={stroke} />
+    </svg>
+  );
+}
+
+function Progress({ pct, color, track = C.line, h = 8 }) {
+  const p = Math.min(100, Math.max(0, pct));
+  return (
+    <div style={{ width: "100%", height: h, background: track, borderRadius: h, overflow: "hidden" }}>
+      <div style={{ width: `${p}%`, height: "100%", background: color, borderRadius: h, transition: "width .5s cubic-bezier(.22,1,.36,1)" }} />
+    </div>
+  );
+}
+
+function Card({ children, style, onClick }) {
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        background: C.card, borderRadius: 18, border: `1px solid ${C.line}`,
+        boxShadow: "0 1px 2px rgba(16,27,52,0.04), 0 1px 12px rgba(16,27,52,0.03)", cursor: onClick ? "pointer" : "default", ...style,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function Pill({ children, color, bg }) {
+  return (
+    <span style={{
+      fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 600, color, background: bg,
+      padding: "4px 10px", borderRadius: 999, display: "inline-flex", alignItems: "center", gap: 4,
+    }}>{children}</span>
+  );
+}
+
+function IconBadge({ Icon, color, size = 40 }) {
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: size * 0.32, background: color + "1A",
+      display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+    }}>
+      <Icon size={size * 0.5} color={color} strokeWidth={2.2} />
+    </div>
+  );
+}
+
+/* ---------------------------- Screens ---------------------------- */
+
+function Header({ title, subtitle, right }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+      <div>
+        <div style={{ fontFamily: "Space Grotesk, sans-serif", fontSize: 22, fontWeight: 700, color: C.ink, letterSpacing: -0.3 }}>{title}</div>
+        {subtitle && <div style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: C.sub, marginTop: 2 }}>{subtitle}</div>}
+      </div>
+      {right}
+    </div>
+  );
+}
+
+function BellButton() {
+  return (
+    <button aria-label="Notifications" style={{
+      width: 40, height: 40, borderRadius: 12, border: `1px solid ${C.line}`, background: C.card,
+      display: "flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: "pointer",
+    }}>
+      <Bell size={18} color={C.navy} />
+      <span style={{ position: "absolute", top: 8, right: 9, width: 7, height: 7, borderRadius: 99, background: C.red, border: "2px solid white" }} />
+    </button>
+  );
+}
+
+function Dashboard({ wallets, tx, budgets, goals, totalMoney, income, expenses, saved, dailyBudget, desktop }) {
+  const animated = useCountUp(totalMoney);
+  const todaysTx = tx.filter((t) => t.date === "2026-08-29");
+  const spentToday = todaysTx.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0);
+  const topCategory = useMemo(() => {
+    const map = {};
+    tx.filter((t) => t.type === "expense").forEach((t) => (map[t.category] = (map[t.category] || 0) + t.amount));
+    const entries = Object.entries(map).sort((a, b) => b[1] - a[1]);
+    return entries[0];
+  }, [tx]);
+
+  const budgetRemaining = budgets.reduce((s, b) => s + Math.max(0, b.amount - b.spent), 0);
+  const budgetTotal = budgets.reduce((s, b) => s + b.amount, 0);
+
+  const HeroCard = (
+    <Card style={{
+      padding: 24, background: `linear-gradient(160deg, ${C.navy} 0%, ${C.navyDeep} 100%)`,
+      border: "none", color: "white", position: "relative", overflow: "hidden",
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: "#A9B7D6", fontWeight: 500 }}>Good morning, Mika</div>
+        <Pill color="#BFE6C4" bg="rgba(30,158,107,0.22)"><TrendingUp size={12} /> +6.2% this week</Pill>
+      </div>
+      <div style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: "#7F8FB5", marginTop: 14 }}>Total money</div>
+      <div style={{ fontFamily: "Space Grotesk, sans-serif", fontSize: 42, fontWeight: 700, letterSpacing: -1, marginTop: 2, fontVariantNumeric: "tabular-nums" }}>
+        {fmt(animated)}
+      </div>
+      <div style={{ marginTop: 10, marginBottom: -6, opacity: 0.9 }}>
+        <Sparkline data={trend14} stroke="#7FD1B3" />
+      </div>
+      <div style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: "#7F8FB5", marginTop: 6 }}>across {wallets.filter(w=>w.active).length} active wallets · last 14 days</div>
+    </Card>
+  );
+
+  const SummaryGrid = (
+    <div style={{ display: "grid", gridTemplateColumns: desktop ? "repeat(4,1fr)" : "1fr 1fr", gap: 12, marginTop: 12 }}>
+      {[
+        { label: "Available to spend", v: 28500 },
+        { label: "Income this month", v: income, tone: "up" },
+        { label: "Expenses this month", v: expenses, tone: "down" },
+        { label: "Saved this month", v: saved, tone: "up" },
+      ].map((s) => (
+        <Card key={s.label} style={{ padding: "14px 16px" }}>
+          <div style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: C.sub, fontWeight: 500 }}>{s.label}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
+            <div style={{ fontFamily: "Space Grotesk, sans-serif", fontSize: 20, fontWeight: 700, color: C.ink, fontVariantNumeric: "tabular-nums" }}>{fmt(s.v)}</div>
+            {s.tone === "up" && <ArrowUpRight size={15} color={C.green} />}
+            {s.tone === "down" && <ArrowDownRight size={15} color={C.red} />}
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+
+  const BudgetCard = (
+    <Card style={{ padding: 18, marginTop: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+        <div style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: C.ink }}>Budget remaining</div>
+        <div style={{ fontFamily: "Space Grotesk, sans-serif", fontSize: 15, fontWeight: 700, color: C.navy }}>{fmt(budgetRemaining)}</div>
+      </div>
+      <div style={{ marginTop: 10 }}>
+        <Progress pct={(budgetRemaining / budgetTotal) * 100} color={C.sky} />
+      </div>
+      <div style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: C.sub, marginTop: 8 }}>
+        {fmt(budgetTotal - budgetRemaining)} used of {fmt(budgetTotal)} across {budgets.length} categories
+      </div>
+    </Card>
+  );
+
+  const InsightCard = (
+    <Card style={{ padding: 18, marginTop: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <Sparkles size={16} color={C.sky} />
+        <div style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: C.ink }}>Financial insights</div>
+      </div>
+      {[
+        `You spent the most on ${topCategory ? topCategory[0] : "Food"} this month — ${topCategory ? fmt(topCategory[1]) : ""} so far.`,
+        `You're saving ₱5,000 more than last month. Keep it up.`,
+        `At this pace, Emergency Fund reaches its goal in about 4 months.`,
+      ].map((line, i) => (
+        <div key={i} style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: C.ink, padding: "9px 0", borderTop: i > 0 ? `1px solid ${C.line}` : "none", lineHeight: 1.4 }}>
+          {line}
+        </div>
+      ))}
+    </Card>
+  );
+
+  const TimelineCard = (
+    <Card style={{ padding: 18, marginTop: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+        <div style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: C.ink }}>Today — Aug 29</div>
+        <div style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: C.sub }}>{todaysTx.length} entries</div>
+      </div>
+      <div style={{ position: "relative", paddingLeft: 46 }}>
+        <div style={{ position: "absolute", left: 15, top: 4, bottom: 4, width: 2, background: C.line }} />
+        {todaysTx.map((t) => {
+          const meta = CAT_META[t.category] || CAT_META.Other;
+          return (
+            <div key={t.id} style={{ position: "relative", marginBottom: 16 }}>
+              <div style={{ position: "absolute", left: -46, top: 0, width: 40, fontFamily: "IBM Plex Mono, monospace", fontSize: 10.5, color: C.faint, textAlign: "right" }}>
+                {t.time}
+              </div>
+              <div style={{ position: "absolute", left: 8, top: 3, width: 9, height: 9, borderRadius: 99, background: t.type === "income" ? C.green : meta.color, border: "2px solid white", boxShadow: `0 0 0 2px ${C.line}` }} />
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={{ fontFamily: "Inter, sans-serif", fontSize: 13.5, fontWeight: 600, color: C.ink }}>{t.note}</div>
+                  <div style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: C.sub }}>{t.category}</div>
+                </div>
+                <div style={{ fontFamily: "IBM Plex Mono, monospace", fontSize: 13, fontWeight: 600, color: t.type === "income" ? C.green : C.ink }}>
+                  {t.type === "income" ? "+" : "-"}{fmt(t.amount)}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ borderTop: `1px solid ${C.line}`, marginTop: 4, paddingTop: 12, display: "flex", justifyContent: "space-between" }}>
+        <div>
+          <div style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: C.sub }}>Spent today</div>
+          <div style={{ fontFamily: "Space Grotesk, sans-serif", fontSize: 16, fontWeight: 700, color: C.ink }}>{fmt(spentToday)}</div>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <div style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: C.sub }}>Daily budget remaining</div>
+          <div style={{ fontFamily: "Space Grotesk, sans-serif", fontSize: 16, fontWeight: 700, color: dailyBudget - spentToday < 0 ? C.red : C.green }}>{fmt(dailyBudget - spentToday)}</div>
+        </div>
+      </div>
+    </Card>
+  );
+
+  const WalletsMini = (
+    <Card style={{ padding: 18, marginTop: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
+        <div style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: C.ink }}>Wallets</div>
+        <div style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: C.sky, fontWeight: 600, cursor: "pointer" }}>See all</div>
+      </div>
+      {wallets.slice(0, 4).map((w) => {
+        const meta = WALLET_META[w.type];
+        return (
+          <div key={w.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0" }}>
+            <IconBadge Icon={meta.icon} color={meta.color} size={36} />
+            <div style={{ flex: 1, fontFamily: "Inter, sans-serif", fontSize: 13.5, fontWeight: 600, color: C.ink }}>{w.name}</div>
+            <div style={{ fontFamily: "IBM Plex Mono, monospace", fontSize: 13.5, fontWeight: 600, color: C.ink }}>{fmt(w.balance)}</div>
+          </div>
+        );
+      })}
+    </Card>
+  );
+
+  if (desktop) {
+    return (
+      <div>
+        <Header title="Dashboard" subtitle="Here's where things stand today" right={<div style={{display:'flex',gap:10}}><BellButton /></div>} />
+        <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 16 }}>
+          <div>
+            {HeroCard}
+            {SummaryGrid}
+            {TimelineCard}
+          </div>
+          <div>
+            {BudgetCard}
+            {WalletsMini}
+            {InsightCard}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+        <div style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: C.sub }}>Good morning</div>
+        <BellButton />
+      </div>
+      {HeroCard}
+      {SummaryGrid}
+      {BudgetCard}
+      {TimelineCard}
+      {InsightCard}
+    </div>
+  );
+}
+
+function WalletsScreen({ wallets, tx, desktop, onSelectWallet }) {
+  const total = wallets.filter((w) => w.active).reduce((s, w) => s + w.balance, 0);
+  return (
+    <div>
+      <Header title="Wallets" subtitle="Where your money actually sits" />
+      <Card style={{ padding: 20, background: C.navy, border: "none", color: "white", marginBottom: 16 }}>
+        <div style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: "#8FA0C4" }}>Total wallet balance</div>
+        <div style={{ fontFamily: "Space Grotesk, sans-serif", fontSize: 30, fontWeight: 700, marginTop: 4, fontVariantNumeric: "tabular-nums" }}>{fmt(total)}</div>
+      </Card>
+      <div style={{ display: "grid", gridTemplateColumns: desktop ? "repeat(3,1fr)" : "1fr", gap: 12 }}>
+        {wallets.map((w) => {
+          const meta = WALLET_META[w.type];
+          const count = tx.filter((t) => t.wallet === w.name).length;
+          return (
+            <Card key={w.id} onClick={() => onSelectWallet(w)} style={{ padding: 16, display: "flex", alignItems: "center", gap: 14 }}>
+              <IconBadge Icon={meta.icon} color={meta.color} size={44} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: "Inter, sans-serif", fontSize: 14.5, fontWeight: 600, color: C.ink }}>{w.name}</div>
+                <div style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: C.sub }}>{count} transactions</div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontFamily: "IBM Plex Mono, monospace", fontSize: 15, fontWeight: 700, color: C.ink }}>{fmt(w.balance)}</div>
+                <ChevronRight size={16} color={C.faint} style={{ marginLeft: "auto", marginTop: 2 }} />
+              </div>
+            </Card>
+          );
+        })}
+        <Card style={{ padding: 16, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, border: `1.5px dashed ${C.faint}`, color: C.sub, minHeight: 76 }}>
+          <Plus size={16} /> <span style={{ fontFamily: "Inter, sans-serif", fontSize: 13.5, fontWeight: 600 }}>Add wallet</span>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function WalletDetail({ wallet, tx, onBack }) {
+  const items = tx.filter((t) => t.wallet === wallet.name);
+  const meta = WALLET_META[wallet.type];
+  return (
+    <div>
+      <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: C.sub, fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0, marginBottom: 16 }}>
+        <ChevronLeft size={16} /> Wallets
+      </button>
+      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>
+        <IconBadge Icon={meta.icon} color={meta.color} size={52} />
+        <div>
+          <div style={{ fontFamily: "Space Grotesk, sans-serif", fontSize: 20, fontWeight: 700, color: C.ink }}>{wallet.name}</div>
+          <div style={{ fontFamily: "IBM Plex Mono, monospace", fontSize: 16, color: C.sub }}>{fmt(wallet.balance)}</div>
+        </div>
+      </div>
+      <div style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, fontWeight: 600, color: C.sub, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.4 }}>History</div>
+      {items.length === 0 && <div style={{ fontFamily: "Inter, sans-serif", fontSize: 13.5, color: C.sub }}>No transactions yet for this wallet.</div>}
+      {items.map((t) => <TxRow key={t.id} t={t} />)}
+    </div>
+  );
+}
+
+function TxRow({ t }) {
+  const meta = CAT_META[t.category] || CAT_META.Other;
+  const isIncome = t.type === "income";
+  const isTransfer = t.type === "transfer";
+  return (
+    <Card style={{ padding: "12px 14px", display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+      <IconBadge Icon={isTransfer ? ArrowLeftRight : meta.icon} color={isTransfer ? C.sky : meta.color} size={38} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontFamily: "Inter, sans-serif", fontSize: 13.5, fontWeight: 600, color: C.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.note}</div>
+        <div style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: C.sub }}>{t.category} · {t.wallet} · {t.date === "2026-08-29" ? "Today" : t.date.slice(5)}</div>
+      </div>
+      <div style={{ fontFamily: "IBM Plex Mono, monospace", fontSize: 13.5, fontWeight: 700, color: isIncome ? C.green : C.ink, flexShrink: 0 }}>
+        {isIncome ? "+" : isTransfer ? "" : "-"}{fmt(t.amount)}
+      </div>
+    </Card>
+  );
+}
+
+function TransactionsScreen({ tx, desktop }) {
+  const [filter, setFilter] = useState("all");
+  const [q, setQ] = useState("");
+  const filtered = tx.filter((t) => (filter === "all" || t.type === filter) && (t.note.toLowerCase().includes(q.toLowerCase()) || t.category.toLowerCase().includes(q.toLowerCase())));
+  const grouped = useMemo(() => {
+    const g = {};
+    filtered.forEach((t) => { (g[t.date] = g[t.date] || []).push(t); });
+    return Object.entries(g).sort((a, b) => (a[0] < b[0] ? 1 : -1));
+  }, [filtered]);
+
+  return (
+    <div>
+      <Header title="Transactions" subtitle={`${tx.length} total entries`} />
+      <div style={{ display: "flex", alignItems: "center", gap: 8, background: C.card, border: `1px solid ${C.line}`, borderRadius: 12, padding: "9px 12px", marginBottom: 14 }}>
+        <Search size={16} color={C.faint} />
+        <input
+          value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search transactions"
+          style={{ border: "none", outline: "none", fontFamily: "Inter, sans-serif", fontSize: 13.5, flex: 1, background: "transparent", color: C.ink }}
+        />
+      </div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, overflowX: "auto" }}>
+        {["all", "income", "expense", "transfer"].map((f) => (
+          <button key={f} onClick={() => setFilter(f)} style={{
+            fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 999, whiteSpace: "nowrap",
+            border: `1px solid ${filter === f ? C.navy : C.line}`, background: filter === f ? C.navy : "white", color: filter === f ? "white" : C.sub, cursor: "pointer",
+          }}>{f[0].toUpperCase() + f.slice(1)}</button>
+        ))}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: desktop ? "repeat(2,1fr)" : "1fr", gap: "0 16px" }}>
+        {grouped.map(([date, items]) => (
+          <div key={date} style={{ marginBottom: 6 }}>
+            <div style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: C.faint, textTransform: "uppercase", letterSpacing: 0.5, margin: "10px 0 8px" }}>
+              {date === "2026-08-29" ? "Today" : date}
+            </div>
+            {items.map((t) => <TxRow key={t.id} t={t} />)}
+          </div>
+        ))}
+        {filtered.length === 0 && <div style={{ fontFamily: "Inter, sans-serif", fontSize: 13.5, color: C.sub, gridColumn: "1/-1" }}>Nothing matches that search yet.</div>}
+      </div>
+    </div>
+  );
+}
+
+function BudgetsScreen({ budgets, desktop }) {
+  return (
+    <div>
+      <Header title="Budgets" subtitle="Monthly limits by category" />
+      <div style={{ display: "grid", gridTemplateColumns: desktop ? "repeat(2,1fr)" : "1fr", gap: 12 }}>
+        {budgets.map((b) => {
+          const meta = CAT_META[b.category] || CAT_META.Other;
+          const pct = (b.spent / b.amount) * 100;
+          const over = b.spent > b.amount;
+          const near = pct >= 85 && !over;
+          const color = over ? C.red : near ? C.orange : C.sky;
+          return (
+            <Card key={b.id} style={{ padding: 18 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                <IconBadge Icon={meta.icon} color={meta.color} size={34} />
+                <div style={{ flex: 1, fontFamily: "Inter, sans-serif", fontSize: 14, fontWeight: 600, color: C.ink }}>{b.category}</div>
+                <div style={{ fontFamily: "IBM Plex Mono, monospace", fontSize: 13, color: C.sub }}>{fmt(b.spent)} / {fmt(b.amount)}</div>
+              </div>
+              <Progress pct={pct} color={color} />
+              {(over || near) && (
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10, fontFamily: "Inter, sans-serif", fontSize: 12.5, fontWeight: 600, color }}>
+                  ⚠️ {over ? `${b.category} budget exceeded by ${fmt(b.spent - b.amount)}.` : `You've used ${Math.round(pct)}% of your ${b.category} budget.`}
+                </div>
+              )}
+            </Card>
+          );
+        })}
+        <Card style={{ padding: 18, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, border: `1.5px dashed ${C.faint}`, color: C.sub, minHeight: 60 }}>
+          <Plus size={16} /> <span style={{ fontFamily: "Inter, sans-serif", fontSize: 13.5, fontWeight: 600 }}>New budget</span>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function GoalsScreen({ goals, desktop }) {
+  return (
+    <div>
+      <Header title="Savings goals" subtitle="What you're building toward" />
+      <div style={{ display: "grid", gridTemplateColumns: desktop ? "repeat(2,1fr)" : "1fr", gap: 12 }}>
+        {goals.map((g) => {
+          const pct = (g.current / g.target) * 100;
+          const remaining = g.target - g.current;
+          return (
+            <Card key={g.id} style={{ padding: 18 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                <div style={{ fontSize: 26 }}>{g.icon}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontFamily: "Inter, sans-serif", fontSize: 14.5, fontWeight: 600, color: C.ink }}>{g.name}</div>
+                  <div style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: C.sub }}>Target {new Date(g.targetDate).toLocaleDateString("en-US", { month: "short", year: "numeric" })}</div>
+                </div>
+                <div style={{ fontFamily: "Space Grotesk, sans-serif", fontSize: 15, fontWeight: 700, color: C.navy }}>{Math.round(pct)}%</div>
+              </div>
+              <Progress pct={pct} color={C.green} />
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10 }}>
+                <div style={{ fontFamily: "IBM Plex Mono, monospace", fontSize: 12.5, color: C.sub }}>{fmt(g.current)} saved</div>
+                <div style={{ fontFamily: "IBM Plex Mono, monospace", fontSize: 12.5, color: C.sub }}>{fmt(remaining)} to go</div>
+              </div>
+              <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                <button style={{ flex: 1, padding: "8px 0", borderRadius: 10, border: "none", background: C.navy, color: "white", fontFamily: "Inter, sans-serif", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>Add money</button>
+                <button style={{ flex: 1, padding: "8px 0", borderRadius: 10, border: `1px solid ${C.line}`, background: "white", color: C.ink, fontFamily: "Inter, sans-serif", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>Withdraw</button>
+              </div>
+            </Card>
+          );
+        })}
+        <Card style={{ padding: 18, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, border: `1.5px dashed ${C.faint}`, color: C.sub, minHeight: 60 }}>
+          <Plus size={16} /> <span style={{ fontFamily: "Inter, sans-serif", fontSize: 13.5, fontWeight: 600 }}>New goal</span>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function ReportsScreen({ tx, desktop }) {
+  const [range, setRange] = useState("Monthly");
+  const byCat = useMemo(() => {
+    const map = {};
+    tx.filter((t) => t.type === "expense").forEach((t) => (map[t.category] = (map[t.category] || 0) + t.amount));
+    return Object.entries(map).map(([name, value]) => ({ name, value, color: (CAT_META[name] || CAT_META.Other).color }));
+  }, [tx]);
+  const weekly = [
+    { d: "Mon", in: 0, out: 480 }, { d: "Tue", in: 0, out: 720 }, { d: "Wed", in: 6000, out: 300 },
+    { d: "Thu", in: 0, out: 650 }, { d: "Fri", in: 0, out: 1250 }, { d: "Sat", in: 0, out: 900 }, { d: "Sun", in: 45000, out: 475 },
+  ];
+  const totalIncome = tx.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0);
+  const totalExpense = tx.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0);
+
+  return (
+    <div>
+      <Header title="Reports" subtitle="How money moved" right={
+        <div style={{ display: "flex", background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 3 }}>
+          {["Weekly", "Monthly"].map((r) => (
+            <button key={r} onClick={() => setRange(r)} style={{
+              fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 600, padding: "6px 12px", borderRadius: 8, border: "none",
+              background: range === r ? C.navy : "transparent", color: range === r ? "white" : C.sub, cursor: "pointer",
+            }}>{r}</button>
+          ))}
+        </div>
+      } />
+      <div style={{ display: "grid", gridTemplateColumns: desktop ? "1fr 1fr" : "1fr", gap: 12 }}>
+        <Card style={{ padding: 18 }}>
+          <div style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: C.ink, marginBottom: 8 }}>Income vs expenses</div>
+          <div style={{ height: 200 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={weekly}>
+                <CartesianGrid vertical={false} stroke={C.line} />
+                <XAxis dataKey="d" tick={{ fontFamily: "Inter, sans-serif", fontSize: 11, fill: C.sub }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontFamily: "Inter, sans-serif", fontSize: 10, fill: C.sub }} axisLine={false} tickLine={false} width={36} tickFormatter={(v)=>v>=1000?`${v/1000}k`:v} />
+                <Tooltip formatter={(v) => fmt(v)} contentStyle={{ fontFamily: "Inter, sans-serif", fontSize: 12, borderRadius: 10, border: `1px solid ${C.line}` }} />
+                <Bar dataKey="in" fill={C.green} radius={[4, 4, 0, 0]} name="Income" />
+                <Bar dataKey="out" fill={C.sky} radius={[4, 4, 0, 0]} name="Expenses" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+        <Card style={{ padding: 18 }}>
+          <div style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: C.ink, marginBottom: 8 }}>Expense by category</div>
+          <div style={{ height: 200, display: "flex", alignItems: "center" }}>
+            <ResponsiveContainer width="50%" height="100%">
+              <PieChart>
+                <Pie data={byCat} dataKey="value" innerRadius={45} outerRadius={70} paddingAngle={2}>
+                  {byCat.map((e, i) => <Cell key={i} fill={e.color} />)}
+                </Pie>
+                <Tooltip formatter={(v) => fmt(v)} contentStyle={{ fontFamily: "Inter, sans-serif", fontSize: 12, borderRadius: 10, border: `1px solid ${C.line}` }} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div style={{ flex: 1, maxHeight: 200, overflowY: "auto" }}>
+              {byCat.sort((a,b)=>b.value-a.value).map((e) => (
+                <div key={e.name} style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: "Inter, sans-serif", fontSize: 12, color: C.ink, padding: "3px 0" }}>
+                  <span style={{ width: 8, height: 8, borderRadius: 99, background: e.color }} />
+                  <span style={{ flex: 1 }}>{e.name}</span>
+                  <span style={{ fontFamily: "IBM Plex Mono, monospace", color: C.sub }}>{fmt(e.value)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Card>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: desktop ? "repeat(4,1fr)" : "1fr 1fr", gap: 12, marginTop: 12 }}>
+        {[
+          { label: "Total income", v: fmt(totalIncome) },
+          { label: "Total expenses", v: fmt(totalExpense) },
+          { label: "Net savings", v: fmt(totalIncome - totalExpense) },
+          { label: "Top category", v: byCat.sort((a,b)=>b.value-a.value)[0]?.name || "—" },
+        ].map((s) => (
+          <Card key={s.label} style={{ padding: 14 }}>
+            <div style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: C.sub }}>{s.label}</div>
+            <div style={{ fontFamily: "Space Grotesk, sans-serif", fontSize: 16, fontWeight: 700, color: C.ink, marginTop: 4 }}>{s.v}</div>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------- Add Transaction ---------------------------- */
+
+function AddTransactionSheet({ wallets, onClose, onSave }) {
+  const [type, setType] = useState("expense");
+  const [amount, setAmount] = useState("");
+  const [category, setCategory] = useState("Food");
+  const [wallet, setWallet] = useState(wallets[0]?.name);
+  const [toWallet, setToWallet] = useState(wallets[1]?.name || wallets[0]?.name);
+  const [note, setNote] = useState("");
+
+  const expenseCats = ["Food", "Transportation", "Bills", "Shopping", "Entertainment", "Health", "Education", "Rent", "Subscription", "Travel", "Gaming", "Other"];
+  const incomeCats = ["Salary", "Freelance", "Business", "Gift", "Other"];
+  const cats = type === "income" ? incomeCats : expenseCats;
+
+  useEffect(() => { setCategory(cats[0]); }, [type]); // eslint-disable-line
+
+  const valid = Number(amount) > 0 && (type !== "transfer" || wallet !== toWallet);
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(16,27,52,0.45)", zIndex: 50, display: "flex", alignItems: "flex-end", justifyContent: "center" }} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        background: C.paper, width: "100%", maxWidth: 480, borderRadius: "24px 24px 0 0", padding: "10px 20px calc(24px + env(safe-area-inset-bottom))",
+        maxHeight: "88vh", overflowY: "auto",
+      }}>
+        <div style={{ width: 40, height: 4, borderRadius: 99, background: C.line, margin: "6px auto 16px" }} />
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <div style={{ fontFamily: "Space Grotesk, sans-serif", fontSize: 18, fontWeight: 700, color: C.ink }}>Add transaction</div>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={20} color={C.sub} /></button>
+        </div>
+
+        <div style={{ display: "flex", background: C.card, border: `1px solid ${C.line}`, borderRadius: 12, padding: 3, marginBottom: 18 }}>
+          {["expense", "income", "transfer"].map((t) => (
+            <button key={t} onClick={() => setType(t)} style={{
+              flex: 1, fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, padding: "9px 0", borderRadius: 9, border: "none",
+              background: type === t ? (t === "income" ? C.green : t === "transfer" ? C.sky : C.navy) : "transparent",
+              color: type === t ? "white" : C.sub, cursor: "pointer", textTransform: "capitalize",
+            }}>{t}</button>
+          ))}
+        </div>
+
+        <div style={{ textAlign: "center", marginBottom: 20 }}>
+          <div style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: C.sub, marginBottom: 6 }}>Amount</div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+            <span style={{ fontFamily: "Space Grotesk, sans-serif", fontSize: 28, color: C.faint }}>₱</span>
+            <input
+              autoFocus inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))}
+              placeholder="0"
+              style={{ fontFamily: "Space Grotesk, sans-serif", fontSize: 38, fontWeight: 700, color: C.ink, border: "none", outline: "none", background: "transparent", width: 180, textAlign: "left" }}
+            />
+          </div>
+        </div>
+
+        {type === "transfer" ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+            <FieldSelect label="From" value={wallet} onChange={setWallet} options={wallets.map((w) => w.name)} />
+            <div style={{ paddingTop: 18 }}><ArrowLeftRight size={16} color={C.faint} /></div>
+            <FieldSelect label="To" value={toWallet} onChange={setToWallet} options={wallets.map((w) => w.name)} />
+          </div>
+        ) : (
+          <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
+            <FieldSelect label="Category" value={category} onChange={setCategory} options={cats} />
+            <FieldSelect label="Wallet" value={wallet} onChange={setWallet} options={wallets.map((w) => w.name)} />
+          </div>
+        )}
+
+        <div style={{ marginBottom: 18 }}>
+          <div style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: C.sub, marginBottom: 6 }}>Note (optional)</div>
+          <input
+            value={note} onChange={(e) => setNote(e.target.value)} placeholder="What was this for?"
+            style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", borderRadius: 12, border: `1px solid ${C.line}`, fontFamily: "Inter, sans-serif", fontSize: 14, outline: "none", background: "white" }}
+          />
+        </div>
+
+        <button
+          disabled={!valid}
+          onClick={() => onSave({ type, amount: Number(amount), category: type === "transfer" ? "Transfer" : category, wallet, toWallet, note: note || (type === "transfer" ? `${wallet} → ${toWallet}` : category) })}
+          style={{
+            width: "100%", padding: "15px 0", borderRadius: 14, border: "none", cursor: valid ? "pointer" : "not-allowed",
+            background: valid ? C.navy : C.line, color: valid ? "white" : C.faint, fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700,
+          }}
+        >
+          Save transaction
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function FieldSelect({ label, value, onChange, options }) {
+  return (
+    <div style={{ flex: 1 }}>
+      <div style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: C.sub, marginBottom: 6 }}>{label}</div>
+      <select value={value} onChange={(e) => onChange(e.target.value)} style={{
+        width: "100%", padding: "12px 10px", borderRadius: 12, border: `1px solid ${C.line}`, fontFamily: "Inter, sans-serif",
+        fontSize: 13.5, color: C.ink, background: "white", outline: "none", appearance: "none",
+      }}>
+        {options.map((o) => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </div>
+  );
+}
+
+/* ---------------------------- Nav shells ---------------------------- */
+
+const NAV_ITEMS = [
+  { id: "home", label: "Home", icon: Home },
+  { id: "wallets", label: "Wallets", icon: Wallet },
+  { id: "add", label: "", icon: Plus },
+  { id: "transactions", label: "History", icon: ArrowLeftRight },
+  { id: "reports", label: "Reports", icon: PieIcon },
+];
+
+const SIDEBAR_ITEMS = [
+  { id: "home", label: "Dashboard", icon: Home },
+  { id: "wallets", label: "Wallets", icon: Wallet },
+  { id: "transactions", label: "Transactions", icon: ArrowLeftRight },
+  { id: "budgets", label: "Budgets", icon: Target },
+  { id: "goals", label: "Savings goals", icon: Sparkles },
+  { id: "reports", label: "Reports", icon: PieIcon },
+  { id: "settings", label: "Settings", icon: Settings },
+];
+
+function FinanceFlow() {
+  const [device, setDevice] = useState(window.innerWidth >= 900 ? "desktop" : "mobile");
+  const [screen, setScreen] = useState("home");
+  const [wallets, setWallets] = useState(initialWallets);
+  const [tx, setTx] = useState(seedTx);
+  const [budgets, setBudgets] = useState(initialBudgets);
+  const [goals] = useState(initialGoals);
+  const [showAdd, setShowAdd] = useState(false);
+  const [selectedWallet, setSelectedWallet] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 2400);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  const totalMoney = wallets.filter((w) => w.active).reduce((s, w) => s + w.balance, 0);
+  const income = tx.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
+  const expenses = tx.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0);
+
+  function handleSave(entry) {
+    const wIdx = wallets.findIndex((w) => w.name === entry.wallet);
+    const next = [...wallets];
+    if (entry.type === "expense") {
+      next[wIdx] = { ...next[wIdx], balance: next[wIdx].balance - entry.amount };
+    } else if (entry.type === "income") {
+      next[wIdx] = { ...next[wIdx], balance: next[wIdx].balance + entry.amount };
+    } else {
+      const tIdx = wallets.findIndex((w) => w.name === entry.toWallet);
+      next[wIdx] = { ...next[wIdx], balance: next[wIdx].balance - entry.amount };
+      next[tIdx] = { ...next[tIdx], balance: next[tIdx].balance + entry.amount };
+    }
+    setWallets(next);
+
+    if (entry.type !== "transfer") {
+      const budgetIdx = budgets.findIndex((b) => b.category === entry.category);
+      if (budgetIdx > -1 && entry.type === "expense") {
+        const nb = [...budgets];
+        nb[budgetIdx] = { ...nb[budgetIdx], spent: nb[budgetIdx].spent + entry.amount };
+        setBudgets(nb);
+      }
+    }
+
+    setTx([{ id: "t" + Date.now(), type: entry.type, category: entry.category, wallet: entry.wallet, amount: entry.amount, note: entry.note, date: "2026-08-29", time: new Date().toTimeString().slice(0, 5) }, ...tx]);
+    setShowAdd(false);
+    setToast(entry.type === "transfer" ? "Transfer complete" : entry.type === "income" ? "Income added" : "Expense added");
+  }
+
+  const dailyBudget = 1000;
+  const saved = income - expenses;
+
+  const screenProps = { wallets, tx, budgets, goals, totalMoney, income, expenses, saved, dailyBudget };
+
+  function renderScreen(desktop) {
+    if (selectedWallet) return <WalletDetail wallet={selectedWallet} tx={tx} onBack={() => setSelectedWallet(null)} />;
+    switch (screen) {
+      case "home": return <Dashboard {...screenProps} desktop={desktop} />;
+      case "wallets": return <WalletsScreen wallets={wallets} tx={tx} desktop={desktop} onSelectWallet={setSelectedWallet} />;
+      case "transactions": return <TransactionsScreen tx={tx} desktop={desktop} />;
+      case "budgets": return <BudgetsScreen budgets={budgets} desktop={desktop} />;
+      case "goals": return <GoalsScreen goals={goals} desktop={desktop} />;
+      case "reports": return <ReportsScreen tx={tx} desktop={desktop} />;
+      case "settings": return (
+        <div>
+          <Header title="Settings" subtitle="Profile, currency, notifications" />
+          <Card style={{ padding: 40, textAlign: "center", color: C.sub, fontFamily: "Inter, sans-serif", fontSize: 13.5 }}>Settings screens ship in the next milestone.</Card>
+        </div>
+      );
+      default: return null;
+    }
+  }
+
+  const DeviceToggle = (
+    <div style={{ display: "flex", background: "white", border: `1px solid ${C.line}`, borderRadius: 10, padding: 3 }}>
+      {["mobile", "desktop"].map((d) => (
+        <button key={d} onClick={() => setDevice(d)} style={{
+          fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 600, padding: "6px 14px", borderRadius: 7, border: "none",
+          background: device === d ? C.navy : "transparent", color: device === d ? "white" : C.sub, cursor: "pointer", textTransform: "capitalize",
+        }}>{d}</button>
+      ))}
+    </div>
+  );
+
+  if (device === "desktop") {
+    return (
+      <div style={{ background: C.paper, minHeight: "100vh", fontFamily: "Inter, sans-serif" }}>
+        <div style={{ display: "flex" }}>
+          <div style={{ width: 232, background: C.navyDeep, minHeight: "100vh", padding: "24px 16px", boxSizing: "border-box", position: "sticky", top: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "0 10px 24px" }}>
+              <div style={{ width: 30, height: 30, borderRadius: 9, background: C.sky, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <TrendingUp size={16} color={C.navyDeep} strokeWidth={2.6} />
+              </div>
+              <div style={{ fontFamily: "Space Grotesk, sans-serif", fontSize: 16, fontWeight: 700, color: "white" }}>FinanceFlow</div>
+            </div>
+            {SIDEBAR_ITEMS.map((item) => {
+              const Icon = item.icon;
+              const active = screen === item.id && !selectedWallet;
+              return (
+                <button key={item.id} onClick={() => { setScreen(item.id); setSelectedWallet(null); }} style={{
+                  width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "11px 12px", borderRadius: 10, marginBottom: 2,
+                  border: "none", background: active ? "rgba(79,163,209,0.16)" : "transparent", color: active ? "white" : "#8FA0C4",
+                  fontFamily: "Inter, sans-serif", fontSize: 13.5, fontWeight: 600, cursor: "pointer", textAlign: "left",
+                }}>
+                  <Icon size={17} color={active ? C.sky : "#8FA0C4"} /> {item.label}
+                </button>
+              );
+            })}
+            <button onClick={() => setShowAdd(true)} style={{
+              width: "100%", marginTop: 16, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px 0",
+              borderRadius: 12, border: "none", background: C.sky, color: C.navyDeep, fontFamily: "Inter, sans-serif", fontSize: 13.5, fontWeight: 700, cursor: "pointer",
+            }}><Plus size={16} /> Add transaction</button>
+          </div>
+          <div style={{ flex: 1, padding: "28px 36px", maxWidth: 1180 }}>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>{DeviceToggle}</div>
+            {renderScreen(true)}
+          </div>
+        </div>
+        {showAdd && <AddTransactionSheet wallets={wallets} onClose={() => setShowAdd(false)} onSave={handleSave} />}
+        {toast && <Toast text={toast} />}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ background: C.paper, minHeight: "100vh", fontFamily: "Inter, sans-serif", display: "flex", justifyContent: "center" }}>
+      <div style={{ width: "100%", maxWidth: 430, minHeight: "100vh", background: C.paper, position: "relative", paddingBottom: "calc(88px + env(safe-area-inset-bottom))" }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", padding: "calc(14px + env(safe-area-inset-top)) 20px 0" }}>{DeviceToggle}</div>
+        <div style={{ padding: "12px 18px 8px" }}>{renderScreen(false)}</div>
+
+        <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, maxWidth: 430, margin: "0 auto", background: "rgba(245,247,250,0.92)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", borderTop: `1px solid ${C.line}`, padding: "10px 12px calc(12px + env(safe-area-inset-bottom))" }}>
+          <div style={{ display: "flex", justifyContent: "space-around", alignItems: "center" }}>
+            {NAV_ITEMS.map((item) => {
+              const Icon = item.icon;
+              if (item.id === "add") {
+                return (
+                  <button key="add" onClick={() => setShowAdd(true)} aria-label="Add transaction" style={{
+                    width: 52, height: 52, borderRadius: 18, border: "none", background: C.navy, color: "white",
+                    display: "flex", alignItems: "center", justifyContent: "center", marginTop: -26, boxShadow: "0 8px 18px rgba(16,27,52,0.35)", cursor: "pointer",
+                  }}><Plus size={24} /></button>
+                );
+              }
+              const active = screen === item.id && !selectedWallet;
+              return (
+                <button key={item.id} onClick={() => { setScreen(item.id); setSelectedWallet(null); }} style={{
+                  background: "none", border: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, cursor: "pointer", padding: "4px 10px",
+                }}>
+                  <Icon size={20} color={active ? C.navy : C.faint} strokeWidth={active ? 2.4 : 2} />
+                  <span style={{ fontFamily: "Inter, sans-serif", fontSize: 10.5, fontWeight: 600, color: active ? C.navy : C.faint }}>{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+      {showAdd && <AddTransactionSheet wallets={wallets} onClose={() => setShowAdd(false)} onSave={handleSave} />}
+      {toast && <Toast text={toast} />}
+    </div>
+  );
+}
+
+function Toast({ text }) {
+  return (
+    <div style={{
+      position: "fixed", bottom: "calc(100px + env(safe-area-inset-bottom))", left: "50%", transform: "translateX(-50%)", background: C.navyDeep, color: "white",
+      padding: "12px 20px", borderRadius: 14, fontFamily: "Inter, sans-serif", fontSize: 13.5, fontWeight: 600, display: "flex", alignItems: "center", gap: 8,
+      boxShadow: "0 10px 30px rgba(16,27,52,0.35)", zIndex: 60, whiteSpace: "nowrap",
+    }}>
+      <Check size={16} color={C.green} /> {text}
+    </div>
+  );
+}
+
+const root = createRoot(document.getElementById("root"));
+root.render(<FinanceFlow />);
+
+const boot = document.getElementById("boot");
+if (boot) {
+  setTimeout(() => {
+    boot.style.opacity = "0";
+    setTimeout(() => boot.remove(), 400);
+  }, 500);
+}
+</script>
+</body>
+</html>
