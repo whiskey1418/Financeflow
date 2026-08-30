@@ -1,7 +1,7 @@
 // Basic offline-friendly caching: app shell is cached on install, then
 // served cache-first with a network fallback so the app opens instantly
 // (and still works with no connection).
-const CACHE_NAME = "financeflow-cache-v1";
+const CACHE_NAME = "financeflow-cache-v2";
 const APP_SHELL = [
   "./",
   "./index.html",
