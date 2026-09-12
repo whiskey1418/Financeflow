@@ -79,6 +79,29 @@
   });
 </script>
 
+<script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js"></script>
+<script>
+  (function () {
+    var firebaseConfig = {
+      apiKey: "AIzaSyAO30Ggg1C8WQRuX2YbM2DTfxC45SAd6Lc",
+      authDomain: "finance-flow-14.firebaseapp.com",
+      projectId: "finance-flow-14",
+      storageBucket: "finance-flow-14.firebasestorage.app",
+      messagingSenderId: "888262849328",
+      appId: "1:888262849328:web:9f17e41c5d3aec4080cef5"
+    };
+    try {
+      firebase.initializeApp(firebaseConfig);
+      window.__ffAuth = firebase.auth();
+      window.__ffDb = firebase.firestore();
+      window.__ffGoogleProvider = new firebase.auth.GoogleAuthProvider();
+    } catch (e) {
+      console.error("Firebase failed to initialize", e);
+    }
+  })();
+</script>
 <script src="app.bundle.js"></script>
 
 <script>
