@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "app.vercel.financeflow_whizkeyy.twa",
+        "sha256_cert_fingerprints": ["22:CC:7E:40:72:47:57:AA:DD:67:D1:DC:44:A4:AD:14:7E:DF:B4:90:14:3A:FB:50:4C:0F:61:BD:2F:6E:F7:49"]
+      }
+    }]
