@@ -47,39 +47,42 @@
     display: none; margin-top: 6px; background: #4FA3D1; color: #101B34; border: none; border-radius: 10px;
     padding: 8px 18px; font-family: Inter, sans-serif; font-weight: 700; font-size: 13px; cursor: pointer;
   }
-  #install-banner {
-    display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
-    background: #101B34; color: #F5F7FA; font-family: Inter, sans-serif;
-    align-items: center; justify-content: space-between; gap: 12px;
-    padding: 10px 14px; padding-top: max(10px, env(safe-area-inset-top));
-    box-shadow: 0 2px 10px rgba(0,0,0,.25);
-  }
-  #install-banner .ib-text { display: flex; flex-direction: column; line-height: 1.25; }
-  #install-banner .ib-title { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 13px; }
-  #install-banner .ib-sub { font-size: 11px; color: #C7D2E0; }
-  #install-banner .ib-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-  #install-banner a.ib-btn {
-    background: #4FA3D1; color: #101B34; text-decoration: none; font-weight: 700; font-size: 13px;
-    padding: 8px 14px; border-radius: 10px; white-space: nowrap;
-  }
-  #install-banner button.ib-close {
-    background: transparent; border: none; color: #C7D2E0; font-size: 18px; line-height: 1;
-    padding: 4px 6px; cursor: pointer;
-  }
-  body.has-install-banner #boot { top: 52px; height: calc(100vh - 52px); height: calc(100dvh - 52px); }
 </style>
 </head>
 <body>
-<div id="install-banner">
-  <div class="ib-text">
-    <span class="ib-title">Install FinanceFlow</span>
-    <span class="ib-sub">Get the Android app for offline access</span>
+<div id="ff-install-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:1000;background:#101B34;color:#fff;padding:10px 14px;align-items:center;justify-content:space-between;font-family:Inter,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.25);">
+  <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+    <div style="width:28px;height:28px;flex-shrink:0;border-radius:8px;background:#4FA3D1;color:#101B34;font-weight:700;display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;">F</div>
+    <span style="font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Get the FinanceFlow Android app</span>
   </div>
-  <div class="ib-actions">
-    <a class="ib-btn" href="FinanceFlow.apk" download="FinanceFlow.apk">Install</a>
-    <button class="ib-close" id="install-banner-close" aria-label="Dismiss">&times;</button>
+  <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
+    <a href="./FinanceFlow.apk" download style="background:#4FA3D1;color:#101B34;padding:7px 14px;border-radius:8px;font-weight:700;font-size:13px;text-decoration:none;">Install</a>
+    <button id="ff-install-dismiss" aria-label="Dismiss" style="background:none;border:none;color:#8FA0C4;font-size:20px;cursor:pointer;line-height:1;padding:0 2px;">&times;</button>
   </div>
 </div>
+<script>
+  (function () {
+    try {
+      var isStandalone = (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone === true;
+      var isAndroid = /Android/i.test(navigator.userAgent);
+      var dismissed = localStorage.getItem("ff_install_banner_dismissed") === "1";
+      var banner = document.getElementById("ff-install-banner");
+      if (isAndroid && !isStandalone && !dismissed && banner) {
+        banner.style.display = "flex";
+        document.documentElement.style.setProperty("--ff-banner-offset", "48px");
+        document.body.style.paddingTop = "48px";
+      }
+      var dismissBtn = document.getElementById("ff-install-dismiss");
+      if (dismissBtn) {
+        dismissBtn.addEventListener("click", function () {
+          if (banner) banner.style.display = "none";
+          document.body.style.paddingTop = "";
+          try { localStorage.setItem("ff_install_banner_dismissed", "1"); } catch (e) {}
+        });
+      }
+    } catch (e) {}
+  })();
+</script>
 <div id="boot">
   <div class="mark">F</div>
   <div class="label">FinanceFlow</div>
@@ -140,34 +143,6 @@
       navigator.serviceWorker.register("sw.js").catch(() => {});
     });
   }
-</script>
-
-<script>
-  (function () {
-    var isAndroid = /Android/i.test(navigator.userAgent);
-    // Already running inside the installed TWA/standalone app? Don't prompt again.
-    var isStandalone =
-      window.matchMedia("(display-mode: standalone)").matches ||
-      document.referrer.indexOf("android-app://") === 0;
-    var dismissed = false;
-    try { dismissed = localStorage.getItem("ff-install-dismissed") === "1"; } catch (e) {}
-
-    if (isAndroid && !isStandalone && !dismissed) {
-      document.body.classList.add("has-install-banner");
-      var banner = document.getElementById("install-banner");
-      if (banner) banner.style.display = "flex";
-    }
-
-    var closeBtn = document.getElementById("install-banner-close");
-    if (closeBtn) {
-      closeBtn.addEventListener("click", function () {
-        var banner = document.getElementById("install-banner");
-        if (banner) banner.style.display = "none";
-        document.body.classList.remove("has-install-banner");
-        try { localStorage.setItem("ff-install-dismissed", "1"); } catch (e) {}
-      });
-    }
-  })();
 </script>
 </body>
 </html>
